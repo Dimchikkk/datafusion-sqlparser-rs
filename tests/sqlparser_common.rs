@@ -15110,3 +15110,26 @@ fn parse_return() {
 fn parse_subquery_limit() {
     let _ = all_dialects().verified_stmt("SELECT t1_id, t1_name FROM t1 WHERE t1_id IN (SELECT t2_id FROM t2 WHERE t1_name = t2_name LIMIT 10)");
 }
+
+#[test]
+fn join_precedence() {
+    all_dialects_except(|d| !d.supports_left_associative_joins_without_parens())
+        .verified_query_with_canonical(
+        "SELECT *
+         FROM t1
+         NATURAL JOIN t5
+         INNER JOIN t0 ON (t0.v1 + t5.v0) > 0
+         WHERE t0.v1 = t1.v0",
+        // canonical string without parentheses
+        "SELECT * FROM t1 NATURAL JOIN t5 INNER JOIN t0 ON (t0.v1 + t5.v0) > 0 WHERE t0.v1 = t1.v0",
+    );
+    all_dialects_except(|d| d.supports_left_associative_joins_without_parens()).verified_query_with_canonical(
+        "SELECT *
+         FROM t1
+         NATURAL JOIN t5
+         INNER JOIN t0 ON (t0.v1 + t5.v0) > 0
+         WHERE t0.v1 = t1.v0",
+        // canonical string with parentheses
+        "SELECT * FROM t1 NATURAL JOIN (t5 INNER JOIN t0 ON (t0.v1 + t5.v0) > 0) WHERE t0.v1 = t1.v0",
+    );
+}
